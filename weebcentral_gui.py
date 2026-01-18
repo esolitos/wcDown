@@ -1,8 +1,8 @@
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLineEdit, QPushButton, QProgressBar,
-                            QLabel, QDoubleSpinBox, QComboBox, QFrame, QScrollArea,
-                            QFileDialog, QMessageBox, QRadioButton, QButtonGroup, QCheckBox)
+                             QLabel, QDoubleSpinBox, QFrame, QScrollArea,
+                             QFileDialog, QMessageBox, QRadioButton, QButtonGroup, QCheckBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon, QFont
 from weebcentral_scraper import WeebCentralScraper

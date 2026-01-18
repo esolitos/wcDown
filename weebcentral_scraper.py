@@ -350,13 +350,16 @@ class WeebCentralScraper:
             try:
                 with Image.open(image_file) as img:
                     img_width, img_height = img.size
-                    
+
                     if self.reencode_for_remarkable:
-                        # For Remarkable: images are already properly sized,
-                        # just fit them to page without additional scaling
+                        # For Remarkable: maintain aspect ratio and center on page
                         pdf.add_page()
-                        # Center the image on the page
-                        pdf.image(image_file, x=0, y=0, w=page_w, h=page_h)
+                        scale = min(page_w / img_width, page_h / img_height)
+                        w_new = img_width * scale
+                        h_new = img_height * scale
+                        x = (page_w - w_new) / 2
+                        y = (page_h - h_new) / 2
+                        pdf.image(image_file, x=x, y=y, w=w_new, h=h_new)
                     else:
                         # A4 mode: determine orientation and scale
                         if img_width > img_height:
@@ -400,7 +403,7 @@ class WeebCentralScraper:
 
     def reencode_images_for_remarkable(self, chapter_dir):
         """Re-encode images optimized for Remarkable tablet.
-        Converts to grayscale PNG, scaled to fit within 1872x1404."""
+        Converts to grayscale PNG, scaled to fit within 1404x1872 (portrait)."""
         logger.info(f"Re-encoding images for Remarkable in: {chapter_dir}")
 
         image_files = sorted([
