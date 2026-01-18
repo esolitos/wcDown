@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from selenium.webdriver.support.ui import WebDriverWait
 from fpdf import FPDF
-from PIL import Image
+from PIL import Image, ImageOps
 import zipfile
 import shutil
 
@@ -403,7 +403,8 @@ class WeebCentralScraper:
 
     def reencode_images_for_remarkable(self, chapter_dir):
         """Re-encode images optimized for Remarkable tablet.
-        Converts to grayscale PNG, scaled to fit within 1404x1872 (portrait)."""
+        Converts to 16-level grayscale PNG, scaled to fit within 1404x1872 (portrait).
+        Uses 4-bit palette mode (16 colors) for optimal compression."""
         logger.info(f"Re-encoding images for Remarkable in: {chapter_dir}")
 
         image_files = sorted([
@@ -428,9 +429,18 @@ class WeebCentralScraper:
                         Image.Resampling.LANCZOS
                     )
 
-                    # Save as PNG
+                    # Quantize to 16 grayscale levels - matches e-ink display
+                    img_posterized = ImageOps.posterize(img_gray, 4)
+
+                    # Convert to palette mode with 16 colors for true 4-bit storage
+                    # This significantly reduces PNG file size vs 8-bit grayscale
+                    img_optimized = img_posterized.convert(
+                        'P', palette=Image.Palette.ADAPTIVE, colors=16
+                    )
+
+                    # Save as PNG with optimization
                     new_path = os.path.splitext(image_file)[0] + '.png'
-                    img_gray.save(new_path, 'PNG', optimize=True)
+                    img_optimized.save(new_path, 'PNG', optimize=True)
 
                     # Remove original if it was a different format
                     if new_path != image_file:
