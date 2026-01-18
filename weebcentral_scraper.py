@@ -25,8 +25,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Supported image extensions
+SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.webp', '.gif')
+
+# Remarkable tablet screen dimensions
+REMARKABLE_MAX_WIDTH = 1872
+REMARKABLE_MAX_HEIGHT = 1404
+
+
+def find_existing_image(directory, basename):
+    """Check if an image with the given basename exists in any supported format.
+    Returns the filepath if found, None otherwise."""
+    for ext in SUPPORTED_IMAGE_EXTENSIONS:
+        filepath = os.path.join(directory, f"{basename}{ext}")
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+            return filepath
+    return None
+
+
 class WeebCentralScraper:
-    def __init__(self, manga_url, chapter_range=None, output_dir="downloads", delay=1.0, max_threads=4, convert_to_pdf=False, convert_to_cbz=False, delete_images_after_conversion=False):
+    def __init__(self, manga_url, chapter_range=None, output_dir="downloads", delay=1.0, max_threads=4, convert_to_pdf=False, convert_to_cbz=False, delete_images_after_conversion=False, reencode_for_remarkable=False):
         self.base_url = "https://weebcentral.com"
         if not manga_url.startswith(('http://', 'https://')):
             manga_url = 'https://' + manga_url
@@ -38,6 +56,7 @@ class WeebCentralScraper:
         self.convert_to_pdf = convert_to_pdf
         self.convert_to_cbz = convert_to_cbz
         self.delete_images_after_conversion = delete_images_after_conversion
+        self.reencode_for_remarkable = reencode_for_remarkable
         
         # Enhanced headers
         self.headers = {
@@ -194,8 +213,12 @@ class WeebCentralScraper:
 
     def download_image(self, img_url, filepath, chapter_url):
         """Download a single image"""
-        if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-            logger.info(f"Skipping {os.path.basename(filepath)} - already exists")
+        # Check if image already exists (in original or converted format)
+        directory = os.path.dirname(filepath)
+        basename = os.path.splitext(os.path.basename(filepath))[0]
+        existing = find_existing_image(directory, basename)
+        if existing:
+            logger.info(f"Skipping {basename} - already exists as {os.path.basename(existing)}")
             return True
 
         try:
@@ -304,7 +327,7 @@ class WeebCentralScraper:
         image_files = sorted([
             os.path.join(chapter_dir, f)
             for f in os.listdir(chapter_dir)
-            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif'))
+            if f.lower().endswith(SUPPORTED_IMAGE_EXTENSIONS)
         ])
         
         if not image_files:
@@ -347,7 +370,7 @@ class WeebCentralScraper:
         image_files = sorted([
             os.path.join(chapter_dir, f)
             for f in os.listdir(chapter_dir)
-            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif'))
+            if f.lower().endswith(SUPPORTED_IMAGE_EXTENSIONS)
         ])
 
         if not image_files:
@@ -359,6 +382,46 @@ class WeebCentralScraper:
             for image_file in image_files:
                 cbz_file.write(image_file, os.path.basename(image_file))
         logger.info(f"Successfully created CBZ: {cbz_path}")
+
+    def reencode_images_for_remarkable(self, chapter_dir):
+        """Re-encode images optimized for Remarkable tablet.
+        Converts to grayscale PNG, scaled to fit within 1872x1404."""
+        logger.info(f"Re-encoding images for Remarkable in: {chapter_dir}")
+
+        image_files = sorted([
+            os.path.join(chapter_dir, f)
+            for f in os.listdir(chapter_dir)
+            if f.lower().endswith(SUPPORTED_IMAGE_EXTENSIONS)
+        ])
+
+        if not image_files:
+            logger.warning(f"No images found in {chapter_dir} to re-encode.")
+            return
+
+        for image_file in image_files:
+            try:
+                with Image.open(image_file) as img:
+                    # Convert to grayscale
+                    img_gray = img.convert('L')
+                    
+                    # Scale down to fit Remarkable screen (largest side fits)
+                    img_gray.thumbnail(
+                        (REMARKABLE_MAX_WIDTH, REMARKABLE_MAX_HEIGHT),
+                        Image.Resampling.LANCZOS
+                    )
+                    
+                    # Save as PNG
+                    new_path = os.path.splitext(image_file)[0] + '.png'
+                    img_gray.save(new_path, 'PNG', optimize=True)
+                    
+                    # Remove original if it was a different format
+                    if new_path != image_file:
+                        os.remove(image_file)
+                        
+            except Exception as e:
+                logger.error(f"Failed to re-encode {image_file}: {e}")
+
+        logger.info(f"Finished re-encoding for Remarkable: {chapter_dir}")
 
     def delete_chapter_images(self, chapter_dir):
         """Delete all images in a chapter directory"""
@@ -480,6 +543,10 @@ class WeebCentralScraper:
                             with open(checkpoint_file, 'a') as f:
                                 f.write(f"{chapter['name']}\n")
                             
+                            # Re-encode for Remarkable before other conversions
+                            if self.reencode_for_remarkable and chapter_dir:
+                                self.reencode_images_for_remarkable(chapter_dir)
+                            
                             if self.convert_to_pdf and chapter_dir:
                                 self.create_pdf_from_chapter(chapter_dir, chapter['name'])
                             if self.convert_to_cbz and chapter_dir:
@@ -530,6 +597,7 @@ if __name__ == "__main__":
     max_threads = int(input("Enter maximum number of download threads (default: 4): ") or "4")
     convert_to_pdf_choice = input("Convert chapters to PDF? (y/n, default: n): ").lower() == 'y'
     convert_to_cbz_choice = input("Convert chapters to CBZ? (y/n, default: n): ").lower() == 'y'
+    reencode_remarkable_choice = input("Re-encode images for Remarkable tablet? (y/n, default: n): ").lower() == 'y'
     delete_images_choice = input("Delete images after conversion? (y/n, default: n): ").lower() == 'y'
     
     scraper = WeebCentralScraper(
@@ -540,6 +608,7 @@ if __name__ == "__main__":
         max_threads=max_threads,
         convert_to_pdf=convert_to_pdf_choice,
         convert_to_cbz=convert_to_cbz_choice,
+        reencode_for_remarkable=reencode_remarkable_choice,
         delete_images_after_conversion=delete_images_choice
     )
     

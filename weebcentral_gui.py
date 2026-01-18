@@ -161,9 +161,11 @@ class MainWindow(QMainWindow):
         conversion_layout = QHBoxLayout()
         self.pdf_checkbox = QCheckBox("Convert to PDF")
         self.cbz_checkbox = QCheckBox("Convert to CBZ")
+        self.remarkable_checkbox = QCheckBox("Re-encode for Remarkable")
         self.delete_checkbox = QCheckBox("Delete images after conversion")
         conversion_layout.addWidget(self.pdf_checkbox)
         conversion_layout.addWidget(self.cbz_checkbox)
+        conversion_layout.addWidget(self.remarkable_checkbox)
         conversion_layout.addWidget(self.delete_checkbox)
         layout.addLayout(conversion_layout)
         
@@ -241,6 +243,7 @@ class MainWindow(QMainWindow):
             output_dir=output_dir,
             convert_to_pdf=self.pdf_checkbox.isChecked(),
             convert_to_cbz=self.cbz_checkbox.isChecked(),
+            reencode_for_remarkable=self.remarkable_checkbox.isChecked(),
             delete_images_after_conversion=self.delete_checkbox.isChecked()
         )
         
