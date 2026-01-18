@@ -565,10 +565,13 @@ class WeebCentralScraper:
                             if self.reencode_for_remarkable and chapter_dir:
                                 self.reencode_images_for_remarkable(chapter_dir)
 
+                            # Sanitize chapter name for file output
+                            safe_chapter_name = re.sub(r'[\\/*?:"<>|]', '_', chapter['name'])
+
                             if self.convert_to_pdf and chapter_dir:
-                                self.create_pdf_from_chapter(chapter_dir, chapter['name'])
+                                self.create_pdf_from_chapter(chapter_dir, safe_chapter_name)
                             if self.convert_to_cbz and chapter_dir:
-                                self.create_cbz_from_chapter(chapter_dir, chapter['name'])
+                                self.create_cbz_from_chapter(chapter_dir, safe_chapter_name)
 
                             if self.delete_images_after_conversion and chapter_dir:
                                 self.delete_chapter_images(chapter_dir)
